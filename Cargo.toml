@@ -1,0 +1,15 @@
+[package]
+name = "rust-app"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+eframe = { version = "0.32.0", default-features = false, features = [
+  "android-native-activity",
+  "default_fonts",
+  "glow",
+]}
+winit = "0.30.11"
+
+[lib]
+crate-type = ["cdylib"]
