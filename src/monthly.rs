@@ -1,6 +1,7 @@
 use crate::{CCursor, CCursorRange};
-use eframe::egui::{self, Button, Color32, Ui};
-#[derive(PartialEq)]
+use eframe::egui::{self, Button, Color32, RichText, Ui};
+use std::collections::BTreeMap;
+#[derive(PartialEq, Copy, Clone, Debug)]
 enum Day {
     None,
     Monday,
@@ -13,149 +14,202 @@ enum Day {
 }
 impl Day {
     fn return_day(&self) -> String {
-        let day = match self {
-            Self::None => "Error",
-            Self::Monday => "Monday",
-            Self::Tuesday => "Tuesday",
-            Self::Wednesday => "Wednesday",
-            Self::Thursday => "Thursday",
-            Self::Friday => "Friday",
-            Self::Saturday => "Saturday",
-            Self::Sunday => "Sunday",
-        };
-        day.to_string()
+        format!("{:?}", self)
     }
 }
-
+#[derive(PartialEq, Clone, Copy, Debug)]
+enum Month {
+    None,
+    January,
+    Febuary,
+    March,
+    April,
+    May,
+    June,
+    July,
+    August,
+    September,
+    October,
+    November,
+    December,
+}
+impl Month {
+    fn return_month(&self) -> u8 {
+        match self {
+            Month::None => 0,
+            Month::January => 1,
+            Month::Febuary => 2,
+            Month::March => 3,
+            Month::April => 4,
+            Month::May => 5,
+            Month::June => 6,
+            Month::July => 7,
+            Month::August => 8,
+            Month::September => 9,
+            Month::October => 10,
+            Month::November => 11,
+            Month::December => 12,
+        }
+    }
+    fn return_month_string(&self) -> String {
+        format!("{:?}", self)
+    }
+}
 pub struct MonthlyCalc {
-    day_text: String,
     day: Day,
+    month: Month,
+    year: u16,
+    year_string: String,
+    year_highlighted: bool,
     date: u8,
+    date_select: bool,
+    date_full: String,
     takings: String,
     takings_highlighted: bool,
-    data_store: Vec<(String, u8, String)>,
-    week_one: bool,
-    week_two: bool,
-    week_three: bool,
-    weekly_store: Vec<f32>,
+    daily_data: BTreeMap<String, (Day, f32)>,
+    week_totals: f32,
+    weekly_totals: BTreeMap<String, f32>,
+    start_week: String,
+    end_week: String,
 }
 impl MonthlyCalc {
     pub fn new() -> Self {
         Self {
-            day_text: String::new(),
             day: Day::None,
+            month: Month::None,
+            year: 0,
+            year_string: String::from("0"),
+            year_highlighted: false,
             date: 1,
+            date_select: false,
+            date_full: String::new(),
             takings: "0".to_owned(),
             takings_highlighted: false,
-            data_store: vec![],
-            week_one: false,
-            week_two: false,
-            week_three: false,
-            weekly_store: vec![0.0; 5],
+            daily_data: BTreeMap::new(),
+            week_totals: 0.0,
+            weekly_totals: BTreeMap::new(),
+            start_week: String::new(),
+            end_week: String::new(),
         }
     }
     pub fn show(&mut self, ui: &mut Ui) {
+        if self.date == 1 {
+            if !self.date_select {
+                self.select_date(ui);
+            }
+        }
+        if self.date_select {
+            self.show_data_entry(ui);
+        }
+        if self.date > 1 {
+            self.show_montly_record(ui);
+        }
+    }
+    fn select_date(&mut self, ui: &mut egui::Ui) {
         ui.columns_const(|[ui_1, ui_2, ui_3]| {
-            ui_1.label("Day");
-            if self.date == 1 {
+            ui_1.vertical_centered(|ui_1| {
+                ui_1.label(
+                    RichText::new("Day")
+                        .underline()
+                        .color(Color32::WHITE)
+                        .monospace(),
+                );
                 self.select_day(ui_1);
-            } else {
-                self.show_day(ui_1);
-            }
-            ui_2.label("Date");
-            self.show_date(ui_2);
-            ui_3.label("Takings");
-            self.enter_takings(ui_3);
+            });
+            ui_2.vertical_centered(|ui_2| {
+                ui_2.label(
+                    RichText::new("Month")
+                        .underline()
+                        .color(Color32::WHITE)
+                        .monospace(),
+                );
+                self.select_month(ui_2);
+            });
+            ui_3.vertical_centered(|ui_3| {
+                ui_3.label(
+                    RichText::new("Year")
+                        .underline()
+                        .color(Color32::WHITE)
+                        .monospace(),
+                );
+                self.select_year(ui_3);
+            });
         });
-        ui.vertical_centered(|ui| {
-            let finalise = ui.add_sized([400.0, 25.0], Button::new("Enter Data"));
-            if finalise.clicked() {
-                self.save_data();
+        ui.vertical_centered_justified(|ui| {
+            if ui
+                .add(
+                    Button::new(
+                        RichText::new("Enter Date")
+                            .color(Color32::WHITE)
+                            .monospace(),
+                    )
+                    .min_size(egui::Vec2 { x: 0.0, y: 25.0 }),
+                )
+                .clicked()
+            {
+                self.date_select = true;
             }
         });
-        self.monthly_takings_list(ui);
+    }
+    fn select_year(&mut self, ui: &mut Ui) {
+        let mut year = egui::TextEdit::singleline(&mut self.year_string)
+            .text_color(Color32::WHITE)
+            .show(ui);
+        if !self.year_highlighted {
+            year.state.cursor.set_char_range(Some(CCursorRange::two(
+                CCursor::new(0),
+                CCursor::new(self.year_string.len()),
+            )));
+            year.state.store(ui.ctx(), year.response.id);
+            self.year_highlighted = true;
+        }
+        if year.response.gained_focus() {
+            self.year_highlighted = false;
+        }
+        self.year = self.year_string.parse::<u16>().unwrap();
+    }
+    fn select_month(&mut self, ui: &mut Ui) {
+        egui::ComboBox::from_id_salt("ID_Month")
+            .selected_text(format!("{:?}", self.month))
+            .show_ui(ui, |ui| {
+                ui.selectable_value(
+                    &mut self.month,
+                    Month::January,
+                    Month::January.return_month_string(),
+                );
+            });
     }
     fn select_day(&mut self, ui: &mut Ui) {
         egui::ComboBox::from_id_salt("DAY")
-            .selected_text(format!("{}", self.day_text))
+            .selected_text(format!("{:?}", self.day))
             .show_ui(ui, |ui| {
-                if ui
-                    .selectable_value(
-                        &mut self.day_text,
-                        Day::Monday.return_day(),
-                        Day::Monday.return_day(),
-                    )
-                    .clicked()
-                {
-                    self.day = Day::Monday;
-                };
-                if ui
-                    .selectable_value(
-                        &mut self.day_text,
-                        Day::Tuesday.return_day(),
-                        Day::Tuesday.return_day(),
-                    )
-                    .clicked()
-                {
-                    self.day = Day::Tuesday;
-                };
-                if ui
-                    .selectable_value(
-                        &mut self.day_text,
-                        Day::Wednesday.return_day(),
-                        Day::Wednesday.return_day(),
-                    )
-                    .clicked()
-                {
-                    self.day = Day::Wednesday;
-                };
-                if ui
-                    .selectable_value(
-                        &mut self.day_text,
-                        Day::Thursday.return_day(),
-                        Day::Thursday.return_day(),
-                    )
-                    .clicked()
-                {
-                    self.day = Day::Thursday;
-                };
-                if ui
-                    .selectable_value(
-                        &mut self.day_text,
-                        Day::Friday.return_day(),
-                        Day::Friday.return_day(),
-                    )
-                    .clicked()
-                {
-                    self.day = Day::Friday;
-                };
-                if ui
-                    .selectable_value(
-                        &mut self.day_text,
-                        Day::Saturday.return_day(),
-                        Day::Saturday.return_day(),
-                    )
-                    .clicked()
-                {
-                    self.day = Day::Saturday;
-                };
-                if ui
-                    .selectable_value(
-                        &mut self.day_text,
-                        Day::Sunday.return_day(),
-                        Day::Sunday.return_day(),
-                    )
-                    .clicked()
-                {
-                    self.day = Day::Sunday
-                };
+                ui.selectable_value(&mut self.day, Day::Monday, Day::Monday.return_day());
             });
     }
     fn show_day(&self, ui: &mut Ui) {
-        ui.label(&self.day_text);
+        ui.label(
+            RichText::new(self.day.return_day())
+                .color(Color32::WHITE)
+                .monospace(),
+        );
     }
     fn show_date(&mut self, ui: &mut Ui) {
-        ui.label(&self.date.to_string());
+        let date = (
+            self.date.to_string(),
+            self.month.return_month().to_string(),
+            self.year.to_string(),
+        );
+        if self.date < 10 {
+            self.date_full =
+                String::from("0".to_string() + &date.0 + "/" + &date.1 + "/" + &date.2);
+        } else {
+            self.date_full = String::from(date.0 + "/" + &date.1 + "/" + &date.2);
+        }
+        ui.label(
+            RichText::new(&self.date_full)
+                .color(Color32::WHITE)
+                .monospace(),
+        );
     }
     fn enter_takings(&mut self, ui: &mut Ui) {
         let mut money = egui::TextEdit::singleline(&mut self.takings)
@@ -173,73 +227,187 @@ impl MonthlyCalc {
             self.takings_highlighted = false;
         }
     }
-    fn save_data(&mut self) {
-        let data = (self.day_text.clone(), self.date, self.takings.clone());
-        self.data_store.push(data);
-        self.next_day();
-        if self.week_one && self.day == Day::Monday {
-            self.week_two = true;
-        }
-        if self.day == Day::Monday {
-            self.week_one = true;
-        }
+    fn show_data_entry(&mut self, ui: &mut egui::Ui) {
+        ui.columns_const(|[ui_1, ui_2, ui_3]| {
+            ui_1.vertical_centered(|ui_1| {
+                ui_1.label(
+                    RichText::new("Day")
+                        .underline()
+                        .color(Color32::WHITE)
+                        .monospace(),
+                );
+                self.show_day(ui_1);
+            });
+            ui_2.vertical_centered(|ui_2| {
+                ui_2.label(
+                    RichText::new("Date")
+                        .underline()
+                        .color(Color32::WHITE)
+                        .monospace(),
+                );
+                self.show_date(ui_2);
+            });
+            ui_3.vertical_centered(|ui_3| {
+                ui_3.label(
+                    RichText::new("Takings")
+                        .underline()
+                        .color(Color32::WHITE)
+                        .monospace(),
+                );
+                self.enter_takings(ui_3);
+            });
+        });
+        ui.vertical_centered(|ui| {
+            let finalise = ui.add_sized(
+                [400.0, 25.0],
+                Button::new(
+                    RichText::new("Enter Data")
+                        .color(Color32::WHITE)
+                        .monospace(),
+                ),
+            );
+            if finalise.clicked() {
+                self.save_data();
+            }
+        });
     }
     fn next_day(&mut self) {
         let tomorrow = match self.day {
             Day::None => Day::None,
-            Day::Monday => Day::Tuesday,
+            Day::Monday => {
+                self.start_week = self.date_full.clone();
+                Day::Tuesday
+            }
             Day::Tuesday => Day::Wednesday,
             Day::Wednesday => Day::Thursday,
             Day::Thursday => Day::Friday,
             Day::Friday => Day::Saturday,
             Day::Saturday => Day::Sunday,
-            Day::Sunday => Day::Monday,
+            Day::Sunday => {
+                self.end_week = self.date_full.clone();
+                self.weekly_totals.push(self.week_totals);
+                self.week_totals = 0.0;
+                Day::Monday
+            }
         };
         self.day = tomorrow;
-        self.day_text = self.day.return_day();
         self.date += 1;
         self.takings = "0".to_string();
     }
-    fn _reset_fields(&mut self) {
-        self.day_text = String::new();
-        self.date = 1;
-        self.takings = "0".to_string();
+    fn save_data(&mut self) {
+        let day_takings = (self.day, self.takings.parse::<f32>().unwrap());
+        self.daily_data.insert(self.date_full.clone(), day_takings);
+        self.takings_highlighted = false;
+        self.get_weekly_total(&self.date_full.clone());
+        self.next_day();
     }
-    fn monthly_takings_list(&mut self, ui: &mut Ui) {
-        self.week_list(ui, 0);
-        if self.week_one {
-            self.week_list(ui, 1);
-            if self.week_two {
-                self.week_list(ui, 2);
-                if self.week_three {
-                    self.week_list(ui, 3);
-                }
-            }
-        }
+    fn show_daily_record(&mut self, ui: &mut egui::Ui, day_key: &str) {
+        let day_info = self.daily_data.get(day_key).unwrap();
+        let day_day = RichText::new(day_info.0.return_day())
+            .color(Color32::WHITE)
+            .monospace();
+        let day_date = RichText::new(day_key).color(Color32::WHITE).monospace();
+        let day_takings = RichText::new(day_info.1.to_string())
+            .color(Color32::WHITE)
+            .monospace();
+
+        ui.columns_const(|[ui_1, ui_2, ui_3]| {
+            ui_1.vertical_centered(|ui_1| {
+                ui_1.label(day_day);
+            });
+            ui_2.vertical_centered(|ui_2| {
+                ui_2.label(day_date);
+            });
+            ui_3.vertical_centered(|ui_3| {
+                ui_3.label(day_takings);
+            });
+        });
     }
-    fn week_list(&mut self, ui: &mut Ui, week_num: usize) {
-        if self.data_store.len() > 0 {
-            ui.columns_const(|[ui_1, ui_2, ui_3]| {
-                for day in 0..(self.data_store.len()) {
-                    ui_1.label(&self.data_store[day].0);
-                    ui_2.label(&self.data_store[day].1.to_string());
-                    ui_3.label(&self.data_store[day].2);
+    fn get_weekly_total(&mut self, daily_info: &str) {
+        let total = self.daily_data.get(daily_info).unwrap();
+        self.week_totals += total.1;
+    }
+    fn show_weekly_total(&mut self, ui: &mut egui::Ui) {
+        ui.columns_const(|[_ui_1, ui_2, ui_3]| {
+            ui_2.vertical_centered(|ui_2| {
+                ui_2.label(
+                    RichText::new("Week totals")
+                        .color(Color32::WHITE)
+                        .monospace(),
+                );
+            });
+            ui_3.vertical_centered(|ui_3| {
+                if self.weekly_totals.len() > 3 {
+                    ui_3.label(
+                        RichText::new(
+                            "$".to_string() + &self.weekly_totals.get(2).unwrap().to_string(),
+                        )
+                        .color(Color32::WHITE)
+                        .monospace(),
+                    );
                 }
-                ui_2.label("Week Total ");
-                if self.week_one {
-                    ui_3.label(format!("{:.2}", self.weekly_store[week_num]));
+                if self.weekly_totals.len() > 2 {
+                    ui_3.label(
+                        RichText::new(
+                            "$".to_string() + &self.weekly_totals.get(1).unwrap().to_string(),
+                        )
+                        .color(Color32::WHITE)
+                        .monospace(),
+                    );
+                }
+                if self.weekly_totals.len() > 1 {
+                    ui_3.label(
+                        RichText::new(
+                            "$".to_string() + &self.weekly_totals.get(0).unwrap().to_string(),
+                        )
+                        .color(Color32::WHITE)
+                        .monospace(),
+                    );
                 } else {
-                    self.weekly_total(ui_3, week_num);
+                    ui_3.label(
+                        RichText::new("$".to_string() + &self.week_totals.to_string())
+                            .color(Color32::WHITE)
+                            .monospace(),
+                    );
                 }
             });
-        }
+        });
     }
-    fn weekly_total(&mut self, ui: &mut egui::Ui, week_num: usize) {
-        let mut weekly = 0.0;
-        for x in &self.data_store {
-            weekly += &x.2.parse::<f32>().unwrap();
+    fn show_montly_record(&mut self, ui: &mut egui::Ui) {
+        let data = self.daily_data.clone();
+        ui.columns_const(|[ui_1, ui_2, ui_3]| {
+            ui_1.vertical_centered(|ui_1| {
+                ui_1.label(
+                    RichText::new("Day")
+                        .underline()
+                        .color(Color32::WHITE)
+                        .monospace(),
+                );
+            });
+            ui_2.vertical_centered(|ui_2| {
+                ui_2.label(
+                    RichText::new("Date")
+                        .underline()
+                        .color(Color32::WHITE)
+                        .monospace(),
+                );
+            });
+            ui_3.vertical_centered(|ui_3| {
+                ui_3.label(
+                    RichText::new("Takings")
+                        .underline()
+                        .color(Color32::WHITE)
+                        .monospace(),
+                );
+            });
+        });
+
+        for daily_info in data.keys() {
+            self.show_daily_record(ui, daily_info);
+            if *daily_info == self.end_week {
+                self.show_weekly_total(ui);
+            }
         }
-        self.weekly_store[week_num] = weekly;
-        ui.label(format!("{:.2}", self.weekly_store[week_num]));
+        self.show_weekly_total(ui);
     }
 }
