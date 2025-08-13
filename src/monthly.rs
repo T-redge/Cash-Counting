@@ -1,3 +1,7 @@
+pub mod day;
+pub mod month;
+pub mod week;
+
 use crate::{CCursor, CCursorRange};
 use eframe::egui::{self, Button, Color32, RichText, Ui};
 use std::collections::BTreeMap;
@@ -71,6 +75,12 @@ pub struct MonthlyCalc {
     weekly_totals: BTreeMap<String, f32>,
     start_week: String,
     end_week: String,
+    week_dates: Vec<String>,
+    week_number: usize,
+    w_one: bool,
+    w_two: bool,
+    w_three: bool,
+    w_four: bool,
 }
 impl MonthlyCalc {
     pub fn new() -> Self {
@@ -90,6 +100,12 @@ impl MonthlyCalc {
             weekly_totals: BTreeMap::new(),
             start_week: String::new(),
             end_week: String::new(),
+            week_dates: Vec::new(),
+            week_number: 0,
+            w_one: false,
+            w_two: false,
+            w_three: false,
+            w_four: false,
         }
     }
     pub fn show(&mut self, ui: &mut Ui) {
@@ -285,7 +301,10 @@ impl MonthlyCalc {
             Day::Saturday => Day::Sunday,
             Day::Sunday => {
                 self.end_week = self.date_full.clone();
-                self.weekly_totals.push(self.week_totals);
+                let week_dates = String::from(self.start_week.clone() + "-" + &self.end_week);
+                self.week_dates.push(week_dates.clone());
+                self.weekly_totals
+                    .insert(self.week_dates[0].clone(), self.week_totals);
                 self.week_totals = 0.0;
                 Day::Monday
             }
@@ -327,7 +346,7 @@ impl MonthlyCalc {
         let total = self.daily_data.get(daily_info).unwrap();
         self.week_totals += total.1;
     }
-    fn show_weekly_total(&mut self, ui: &mut egui::Ui) {
+    fn show_weekly_total(&mut self, ui: &mut egui::Ui, week_num: usize) {
         ui.columns_const(|[_ui_1, ui_2, ui_3]| {
             ui_2.vertical_centered(|ui_2| {
                 ui_2.label(
@@ -336,45 +355,32 @@ impl MonthlyCalc {
                         .monospace(),
                 );
             });
-            ui_3.vertical_centered(|ui_3| {
-                if self.weekly_totals.len() > 3 {
-                    ui_3.label(
-                        RichText::new(
-                            "$".to_string() + &self.weekly_totals.get(2).unwrap().to_string(),
-                        )
-                        .color(Color32::WHITE)
-                        .monospace(),
-                    );
-                }
-                if self.weekly_totals.len() > 2 {
-                    ui_3.label(
-                        RichText::new(
-                            "$".to_string() + &self.weekly_totals.get(1).unwrap().to_string(),
-                        )
-                        .color(Color32::WHITE)
-                        .monospace(),
-                    );
-                }
-                if self.weekly_totals.len() > 1 {
-                    ui_3.label(
-                        RichText::new(
-                            "$".to_string() + &self.weekly_totals.get(0).unwrap().to_string(),
-                        )
-                        .color(Color32::WHITE)
-                        .monospace(),
-                    );
-                } else {
-                    ui_3.label(
-                        RichText::new("$".to_string() + &self.week_totals.to_string())
-                            .color(Color32::WHITE)
-                            .monospace(),
-                    );
+            ui_3.vertical_centered(|ui| {
+                if self.week_dates.len() > 0 {
+                    let week = self.weekly_totals.contains_key(&self.week_dates[week_num]);
+                    if week {
+                        let w = self.weekly_totals.get(&self.week_dates[week_num]).unwrap();
+                        ui.label(
+                            RichText::new(w.to_string())
+                                .color(Color32::WHITE)
+                                .monospace(),
+                        );
+                    }
                 }
             });
         });
     }
-    fn show_montly_record(&mut self, ui: &mut egui::Ui) {
+    fn weekly(&mut self, ui: &mut egui::Ui, key: usize) {
         let data = self.daily_data.clone();
+        for daily_info in data.keys() {
+            self.show_daily_record(ui, &daily_info);
+            if *daily_info == self.end_week {
+                self.show_weekly_total(ui, key);
+                break;
+            }
+        }
+    }
+    fn show_montly_record(&mut self, ui: &mut egui::Ui) {
         ui.columns_const(|[ui_1, ui_2, ui_3]| {
             ui_1.vertical_centered(|ui_1| {
                 ui_1.label(
@@ -401,13 +407,17 @@ impl MonthlyCalc {
                 );
             });
         });
-
-        for daily_info in data.keys() {
-            self.show_daily_record(ui, daily_info);
-            if *daily_info == self.end_week {
-                self.show_weekly_total(ui);
-            }
+        if self.w_one {
+            self.weekly(ui, 0);
         }
-        self.show_weekly_total(ui);
+        if self.w_two {
+            self.weekly(ui, 1);
+        }
+        if self.w_three {
+            self.weekly(ui, 2);
+        }
+        if self.w_four {
+            self.weekly(ui, 3);
+        }
     }
 }
