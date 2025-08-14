@@ -1,67 +1,17 @@
 pub mod day;
 pub mod month;
 pub mod week;
-
 use crate::{CCursor, CCursorRange};
 use eframe::egui::{self, Button, Color32, RichText, Ui};
 use std::collections::BTreeMap;
-#[derive(PartialEq, Copy, Clone, Debug)]
-enum Day {
-    None,
-    Monday,
-    Tuesday,
-    Wednesday,
-    Thursday,
-    Friday,
-    Saturday,
-    Sunday,
-}
-impl Day {
-    fn return_day(&self) -> String {
-        format!("{:?}", self)
-    }
-}
-#[derive(PartialEq, Clone, Copy, Debug)]
-enum Month {
-    None,
-    January,
-    Febuary,
-    March,
-    April,
-    May,
-    June,
-    July,
-    August,
-    September,
-    October,
-    November,
-    December,
-}
-impl Month {
-    fn return_month(&self) -> u8 {
-        match self {
-            Month::None => 0,
-            Month::January => 1,
-            Month::Febuary => 2,
-            Month::March => 3,
-            Month::April => 4,
-            Month::May => 5,
-            Month::June => 6,
-            Month::July => 7,
-            Month::August => 8,
-            Month::September => 9,
-            Month::October => 10,
-            Month::November => 11,
-            Month::December => 12,
-        }
-    }
-    fn return_month_string(&self) -> String {
-        format!("{:?}", self)
-    }
-}
+use {
+    day::{Day, *},
+    month::{Month, *},
+};
+
 pub struct MonthlyCalc {
-    day: Day,
-    month: Month,
+    day: DayCalc,
+    month: MonthCalc,
     year: u16,
     year_string: String,
     year_highlighted: bool,
@@ -85,8 +35,8 @@ pub struct MonthlyCalc {
 impl MonthlyCalc {
     pub fn new() -> Self {
         Self {
-            day: Day::None,
-            month: Month::None,
+            day: DayCalc::new(),
+            month: MonthCalc::new(),
             year: 0,
             year_string: String::from("0"),
             year_highlighted: false,
@@ -130,7 +80,7 @@ impl MonthlyCalc {
                         .color(Color32::WHITE)
                         .monospace(),
                 );
-                self.select_day(ui_1);
+                //   self.select_day(ui_1);
             });
             ui_2.vertical_centered(|ui_2| {
                 ui_2.label(
@@ -186,33 +136,19 @@ impl MonthlyCalc {
     }
     fn select_month(&mut self, ui: &mut Ui) {
         egui::ComboBox::from_id_salt("ID_Month")
-            .selected_text(format!("{:?}", self.month))
+            // .selected_text(format!("{:?}", self.month))
             .show_ui(ui, |ui| {
-                ui.selectable_value(
-                    &mut self.month,
-                    Month::January,
-                    Month::January.return_month_string(),
-                );
+                // ui.selectable_value(
+                //    &mut self.month,
+                //    Month::January,
+                //    Month::January.return_month_name(),
+                // );
             });
-    }
-    fn select_day(&mut self, ui: &mut Ui) {
-        egui::ComboBox::from_id_salt("DAY")
-            .selected_text(format!("{:?}", self.day))
-            .show_ui(ui, |ui| {
-                ui.selectable_value(&mut self.day, Day::Monday, Day::Monday.return_day());
-            });
-    }
-    fn show_day(&self, ui: &mut Ui) {
-        ui.label(
-            RichText::new(self.day.return_day())
-                .color(Color32::WHITE)
-                .monospace(),
-        );
     }
     fn show_date(&mut self, ui: &mut Ui) {
         let date = (
             self.date.to_string(),
-            self.month.return_month().to_string(),
+            //self.month.return_month_num().to_string(),
             self.year.to_string(),
         );
         if self.date < 10 {
@@ -226,22 +162,6 @@ impl MonthlyCalc {
                 .color(Color32::WHITE)
                 .monospace(),
         );
-    }
-    fn enter_takings(&mut self, ui: &mut Ui) {
-        let mut money = egui::TextEdit::singleline(&mut self.takings)
-            .text_color(Color32::WHITE)
-            .show(ui);
-        if !self.takings_highlighted {
-            money.state.cursor.set_char_range(Some(CCursorRange::two(
-                CCursor::new(0),
-                CCursor::new(self.takings.len()),
-            )));
-            money.state.store(ui.ctx(), money.response.id);
-            self.takings_highlighted = true;
-        }
-        if money.response.gained_focus() {
-            self.takings_highlighted = false;
-        }
     }
     fn show_data_entry(&mut self, ui: &mut egui::Ui) {
         ui.columns_const(|[ui_1, ui_2, ui_3]| {
@@ -288,30 +208,30 @@ impl MonthlyCalc {
         });
     }
     fn next_day(&mut self) {
-        let tomorrow = match self.day {
-            Day::None => Day::None,
-            Day::Monday => {
-                self.start_week = self.date_full.clone();
-                Day::Tuesday
-            }
-            Day::Tuesday => Day::Wednesday,
-            Day::Wednesday => Day::Thursday,
-            Day::Thursday => Day::Friday,
-            Day::Friday => Day::Saturday,
-            Day::Saturday => Day::Sunday,
-            Day::Sunday => {
-                self.end_week = self.date_full.clone();
-                let week_dates = String::from(self.start_week.clone() + "-" + &self.end_week);
-                self.week_dates.push(week_dates.clone());
-                self.weekly_totals
-                    .insert(self.week_dates[0].clone(), self.week_totals);
-                self.week_totals = 0.0;
-                Day::Monday
-            }
-        };
-        self.day = tomorrow;
-        self.date += 1;
-        self.takings = "0".to_string();
+        //let tomorrow = match self.day {
+        //    Day::None => Day::None,
+        //    Day::Monday => {
+        //        self.start_week = self.date_full.clone();
+        //        Day::Tuesday
+        //    }
+        //    Day::Tuesday => Day::Wednesday,
+        //    Day::Wednesday => Day::Thursday,
+        //    Day::Thursday => Day::Friday,
+        //    Day::Friday => Day::Saturday,
+        //    Day::Saturday => Day::Sunday,
+        //    Day::Sunday => {
+        //        self.end_week = self.date_full.clone();
+        //        let week_dates = String::from(self.start_week.clone() + "-" + &self.end_week);
+        //        self.week_dates.push(week_dates.clone());
+        //         self.weekly_totals
+        //            .insert(self.week_dates[0].clone(), self.week_totals);
+        //        self.week_totals = 0.0;
+        //        Day::Monday
+        //    }
+        //};
+        // self.day = tomorrow;
+        // self.date += 1;
+        // self.takings = "0".to_string();
     }
     fn save_data(&mut self) {
         let day_takings = (self.day, self.takings.parse::<f32>().unwrap());
