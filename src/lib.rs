@@ -1,6 +1,6 @@
 pub mod banking;
 pub mod cash;
-pub mod monthly;
+pub mod monthly_takings;
 pub mod numpad;
 use {
     banking::*,
@@ -11,7 +11,7 @@ use {
             text::{CCursor, CCursorRange},
         },
     },
-    monthly::*,
+    monthly_takings::*,
     numpad::*,
 };
 #[derive(PartialEq)]
@@ -24,7 +24,7 @@ enum Tab {
 pub struct CashCalculator {
     numpad: Keypad,
     banking_calc: BankingCalc,
-    monthly_calc: MonthlyCalc,
+    monthly_calc: MonthlyTakings,
 
     tab: Tab,
 }
@@ -34,7 +34,7 @@ impl CashCalculator {
         Self {
             numpad: Keypad::new(),
             banking_calc: BankingCalc::new(),
-            monthly_calc: MonthlyCalc::new(),
+            monthly_calc: MonthlyTakings::new(),
 
             tab: Tab::None,
         }

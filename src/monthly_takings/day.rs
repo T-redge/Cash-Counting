@@ -27,7 +27,6 @@ impl Day {
 pub struct DayCalc {
     day: Day,
     day_date: u8,
-    date_selected: bool,
     day_takings: String,
     highlighted: bool,
 }
@@ -36,16 +35,22 @@ impl DayCalc {
         Self {
             day: Day::None,
             day_date: 1,
-            date_selected: false,
+
             day_takings: "0".to_string(),
             highlighted: false,
         }
     }
     pub fn select_day(&mut self, ui: &mut egui::Ui) {
-        egui::ComboBox::from_id_salt("DAY")
+        egui::ComboBox::from_id_salt("ID_Day")
             .selected_text(format!("{:?}", self.day))
             .show_ui(ui, |ui| {
                 ui.selectable_value(&mut self.day, Day::Monday, Day::Monday.return_day());
+                ui.selectable_value(&mut self.day, Day::Tuesday, Day::Tuesday.return_day());
+                ui.selectable_value(&mut self.day, Day::Wednesday, Day::Wednesday.return_day());
+                ui.selectable_value(&mut self.day, Day::Thursday, Day::Thursday.return_day());
+                ui.selectable_value(&mut self.day, Day::Friday, Day::Friday.return_day());
+                ui.selectable_value(&mut self.day, Day::Saturday, Day::Saturday.return_day());
+                ui.selectable_value(&mut self.day, Day::Sunday, Day::Sunday.return_day());
             });
     }
     pub fn enter_takings(&mut self, ui: &mut egui::Ui) {
@@ -58,14 +63,14 @@ impl DayCalc {
                 CCursor::new(self.day_takings.len()),
             )));
             money.state.store(ui.ctx(), money.response.id);
-            self.change_day_selected();
         }
-        if money.response.gained_focus() {
-            self.change_day_selected();
-        }
+        if money.response.gained_focus() {}
     }
     pub fn return_day_date(&self) -> u8 {
         self.day_date
+    }
+    pub fn return_day(&self) -> Day {
+        self.day
     }
     pub fn return_day_takings(&self) -> f32 {
         let dollar = self.day_takings.parse::<f32>().unwrap();
@@ -77,12 +82,7 @@ impl DayCalc {
     pub fn reset_day_takings(&mut self) {
         self.day_takings = "0".to_string();
     }
-    pub fn change_day_selected(&mut self) {
-        match self.date_selected {
-            true => self.date_selected = false,
-            false => self.date_selected = true,
-        }
-    }
+
     pub fn increment_day(&mut self) {
         let tomorrow = match self.day {
             Day::None => Day::None,
